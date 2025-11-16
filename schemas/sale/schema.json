@@ -1,0 +1,28 @@
+{
+  "name": "Sale",
+  "schema_id": 1,
+  "version": 1,
+  "fields": [
+    {
+      "pos": 0,
+      "backend": "tenant_id",
+      "frontend": "tenant",
+      "type": "string",
+      "required": true
+    },
+    {
+      "pos": 1,
+      "backend": "date",
+      "frontend": "sale_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "pos": 2,
+      "backend": "total",
+      "frontend": "amount",
+      "type": "number",
+      "required": true
+    }
+  ]
+}
