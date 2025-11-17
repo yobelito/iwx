@@ -1,10 +1,9 @@
 // Schema registry and validation utilities for IWX
-import fs from 'fs';
-import path from 'path';
 import { ERROR_CODES, IwxError } from './errors.js';
 
 const registry = new Map();
 const ALLOWED_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'date', 'object']);
+const nodeDeps = { fs: null, path: null };
 
 const builtInSchemas = [
   {
@@ -18,6 +17,24 @@ const builtInSchemas = [
     ]
   }
 ];
+
+function isNodeEnvironment() {
+  return typeof process !== 'undefined' && Boolean(process.versions?.node);
+}
+
+async function ensureNodeDeps() {
+  if (nodeDeps.fs && nodeDeps.path) return nodeDeps;
+  if (!isNodeEnvironment()) {
+    throw new IwxError(
+      ERROR_CODES.SCHEMA_INVALID,
+      'File-based schema loading is only available in Node.js environments'
+    );
+  }
+  const [fsModule, pathModule] = await Promise.all([import('node:fs'), import('node:path')]);
+  nodeDeps.fs = fsModule.default ?? fsModule;
+  nodeDeps.path = pathModule.default ?? pathModule;
+  return nodeDeps;
+}
 
 function validateSchemaDefinition(schema) {
   if (!schema || typeof schema.schema_id !== 'number' || !Array.isArray(schema.fields)) {
@@ -59,7 +76,8 @@ export function listSchemas() {
   return Array.from(registry.values());
 }
 
-export function loadSchemaFile(filePath, { yamlParser } = {}) {
+export async function loadSchemaFile(filePath, { yamlParser } = {}) {
+  const { fs, path } = await ensureNodeDeps();
   const ext = path.extname(filePath).toLowerCase();
   const content = fs.readFileSync(filePath, 'utf8');
   let parsed;
@@ -80,14 +98,15 @@ export function loadSchemaFile(filePath, { yamlParser } = {}) {
   return registerSchema(parsed);
 }
 
-export function loadSchemasFromDirectory(directoryPath, { yamlParser } = {}) {
+export async function loadSchemasFromDirectory(directoryPath, { yamlParser } = {}) {
+  const { fs, path } = await ensureNodeDeps();
   const files = fs.readdirSync(directoryPath, { withFileTypes: true });
   for (const entry of files) {
     if (!entry.isFile()) continue;
     const ext = path.extname(entry.name).toLowerCase();
     if (ext !== '.json' && ext !== '.yml' && ext !== '.yaml') continue;
     const filePath = path.join(directoryPath, entry.name);
-    loadSchemaFile(filePath, { yamlParser });
+    await loadSchemaFile(filePath, { yamlParser });
   }
   return listSchemas();
 }
