@@ -21,9 +21,8 @@ def _validate_value(field: dict, obj: dict, source: str):
 
 
 def _build_values(schema: dict, obj_front: dict, source: str):
-    values = []
-    for field in schema['fields']:
-        values.append(None)
+    max_pos = max((field['pos'] for field in schema['fields']), default=-1)
+    values = [None] * (max_pos + 1)
     for field in schema['fields']:
         values[field['pos']] = _validate_value(field, obj_front, source)
     return values
