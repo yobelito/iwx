@@ -4,6 +4,7 @@ IWX define actualmente dos perfiles principales de transporte:
 
 - **IWX-JSON**: usa JSON como contenedor.
 - **IWX-BIN**: usa un frame binario compacto.
+- **IWX-JSONL**: usa eventos JSON delimitados por nuevas líneas para streaming.
 
 ## 1. IWX-JSON
 
@@ -72,4 +73,30 @@ IWX-BIN está destinado principalmente a:
 - Comunicación interna entre servicios.
 - Sincronización móvil / edge.
 - Colas de mensajes y streaming.
+
+## 3. IWX-JSONL (propuesto)
+
+- `Content-Type: application/vnd.iwx+jsonl`
+- Basado en *newline-delimited JSON* (`NDJSON`), donde cada línea es un payload IWX independiente.
+- Ideal para streaming en HTTP chunked, WebSockets o colas de logs donde los mensajes se procesan uno a uno.
+
+Ejemplo (dos eventos en el mismo stream):
+
+```json
+{"_s": 1, "_v": ["t-001", "2025-01-01", 199.9]}
+{"_s": 1, "_v": ["t-002", "2025-01-02", 59.5]}
+```
+
+Guías de implementación:
+
+- Cada línea debe terminar con `\n` y ser un JSON válido según `IWX-SPEC-v1.0.md`.
+- El consumidor debe tratar cada línea como un mensaje autónomo y validar la longitud de `_v` antes de decodificar.
+- Para flows seguros, el formato por línea incluye `_k`, `_a`, `_iv` y `_v` cifrado igual que IWX-JSON.
+- Se recomienda limitar el tamaño máximo por línea para evitar abusos en streams largos.
+
+Casos de uso:
+
+- Ingesta de eventos o telemetría en tiempo real.
+- Jobs batch que procesan millones de registros sin cargar todo el archivo en memoria.
+- Debugging y replay de tráfico registrando cada línea como un mensaje reproducible.
 
