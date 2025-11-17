@@ -1,290 +1,151 @@
-# IWX — Index Wire eXchange Protocol  
-**Versión: 1.0.0 (Draft Estable)**  
-**Licencia: Apache 2.0**
+# IWX — Index Wire eXchange Protocol
+**Version: 1.0.0 (Draft)** · **License: Apache 2.0**
 
-IWX es un protocolo de transporte compacto, seguro y basado en esquemas, diseñado para reemplazar cargas JSON verbosas por estructuras indexadas extremadamente ligeras, fáciles de validar y aptas para comunicación cliente-servidor, microservicios, edge computing y aplicaciones de alto rendimiento.
+IWX is a compact, schema-indexed wire format that replaces verbose JSON objects with positionally addressed value arrays. The protocol cleanly separates frontend aliases from backend names, supports encrypted payloads through the IWX-Secure profile, and defines JSON and binary transports.
 
----
-
-## 🔥 Características principales
-
-- **Representación compacta**  
-  Basado en índices (`pos`) en lugar de nombres de campos.
-
-- **Separación de frontend / backend**  
-  Frontend usa alias propios; backend usa nombres internos. Ambos mapeados por esquema.
-
-- **Seguro por diseño**  
-  Perfil opcional **IWX-Secure** con AES-256-GCM sobre `_v`.
-
-- **Extensible**  
-  Versionado por esquema (`schema_id`), nuevos perfiles (JSON, BIN).
-
-- **Futuro post-cuántico**  
-  La arquitectura admite algoritmos alternativos en `_a` para cifrado avanzado futuro.
-
-- **Compatible con REST**  
-  No reemplaza HTTP/HTTPS, sino que define un *wire format* portable.
+- **Official language:** English (Spanish translation available in [`README.es.md`](README.es.md)).
+- **Primary specifications:** [`specs/IWX-SPEC-v1.0.md`](specs/IWX-SPEC-v1.0.md) · [`specs/IWX-SECURE-v1.0.md`](specs/IWX-SECURE-v1.0.md) · [`specs/TRANSPORT-PROFILES.md`](specs/TRANSPORT-PROFILES.md) · [`specs/SCHEMA-SPEC.md`](specs/SCHEMA-SPEC.md)
+- **Libraries:** JavaScript (ESM), Python, PHP implementations under [`libs/`](libs/)
 
 ---
 
-## 📦 Instalación / Integración
+## Key capabilities
+- **Compact representation:** values live in `_v` following positional `pos` indexes defined by the schema id `_s`.
+- **Frontend/backed mapping:** schemas map public aliases to backend fields so neither side leaks internal naming.
+- **Secure profile:** optional AES-256-GCM encryption for `_v` with `_k` (key id), `_a` (algorithm), `_iv` (nonce), `_v` (ciphertext).
+- **Binary transport:** framed payload (`IWX` magic + version + schema id + counts + JSON-encoded values) for extra efficiency.
+- **Extensible:** per-schema versioning, transport profiles (JSON, BIN), forward-looking PQ crypto slot via `_a`.
 
-### JavaScript / Browser / Node
-```bash
-# próximamente vía npm
-npm install iwx-protocol
+---
+
+## Installation
+### JavaScript (Browser/Node ESM)
+```
+npm install iwx-protocol  # coming soon; use libs/js for reference
 ```
 
 ### Python
-```bash
-# próximamente vía pip
-pip install iwx
+```
+pip install iwx  # planned; use libs/python for reference
 ```
 
 ### PHP
-```bash
-# vía composer (planeado)
-composer require iwx-protocol/iwx
 ```
-
-*(Las librerías incluidas en este repo sirven como base para la implementación.)*
-
----
-
-## 📚 Tabla de Contenidos
-
-1. [Introducción](#-introducción)  
-2. [Estructura del Payload IWX](#-estructura-del-payload-iwx)  
-3. [Ejemplos de Uso](#-ejemplos-de-uso)  
-4. [Perfiles de Transporte](#-perfiles-de-transporte)  
-5. [IWX-Secure](#-iwx-secure)  
-6. [Esquemas](#-esquemas)  
-7. [Implementaciones por Lenguaje](#-implementaciones-por-lenguaje)  
-8. [Roadmap](#-roadmap)  
-9. [Contribuir](#-contribuir)  
-10. [Licencia](#-licencia)
-
----
-
-## 🧠 Introducción
-
-Los formatos modernos como JSON son fáciles de usar, pero repetitivos:
-
-```json
-{
-  "tenant_id": "t-001",
-  "date": "2025-01-01",
-  "total": 199.9
-}
-```
-
-En un sistema de miles de requests por segundo:
-
-- Los nombres de campos ocupan más que los valores.
-- El backend queda expuesto (nombres internos).
-- Todo depende únicamente de TLS para la confidencialidad.
-
-**IWX resuelve esto:**
-
-```json
-{
-  "_s": 1,
-  "_v": ["t-001", "2025-01-01", 199.9]
-}
-```
-
-Con un esquema predefinido:
-
-```json
-{
-  "schema_id": 1,
-  "fields": [
-    { "pos": 0, "frontend": "tenant", "backend": "tenant_id", "type": "string" },
-    { "pos": 1, "frontend": "sale_date", "backend": "date", "type": "date" },
-    { "pos": 2, "frontend": "amount", "backend": "total", "type": "number" }
-  ]
-}
+composer require iwx-protocol/iwx  # planned; use libs/php for reference
 ```
 
 ---
 
-## 🧩 Estructura del Payload IWX
-
-Payload JSON básico:
-
+## Payload anatomy
 ```json
 {
   "_s": <schema_id>,
-  "_v": [ <valores_por_posición> ]
+  "_v": [<values_by_position>]
 }
 ```
+- `_s`: schema identifier (from registry)
+- `_v`: values ordered by `pos` as defined in the schema
 
-- `_s`: Identificador del esquema  
-- `_v`: Array con valores según `pos`
-
----
-
-## 🧪 Ejemplos de Uso
-
-### Frontend → Backend (JS)
-
-```js
-import { iwxEncodePlain } from "./libs/js/encoder.js";
-
-const sale = {
-  tenant: "t-001",
-  sale_date: "2025-01-01",
-  amount: 199.9
-};
-
-const payload = iwxEncodePlain(1, sale);
-
-console.log(payload);
-// { _s: 1, _v: ["t-001", "2025-01-01", 199.9] }
-```
-
-### Backend (Python)
-
-```python
-from libs.python.decoder import iwx_decode_to_backend
-
-payload = {
-    "_s": 1,
-    "_v": ["t-001", "2025-01-01", 199.9]
-}
-
-obj = iwx_decode_to_backend(payload)
-print(obj)
-
-# {'tenant_id': 't-001', 'date': '2025-01-01', 'total': 199.9}
-```
-
----
-
-## 🔐 IWX-Secure
-
-Perfil cifrado sobre `_v` usando AES-256-GCM:
-
+Secure profile wrapper:
 ```json
 {
   "_s": 1,
   "_k": "iwx-ks-123",
   "_a": "AES-256-GCM",
   "_iv": "BASE64(iv)",
-  "_v": "BASE64(ciphertext)"
+  "_v": "BASE64(ciphertext_of_json(_v))"
 }
 ```
 
-El handshake:
-
-```http
-POST /iwx/handshake
-→ { "key_id": "iwx-ks-123", "alg": "AES-256-GCM", "key": "BASE64(32_bytes)" }
+Binary framing (IWX-BIN v1):
 ```
-
-El cliente cifra los valores.  
-El servidor descifra con la clave de sesión.
-
----
-
-## 🚚 Perfiles de Transporte
-
-IWX define 2 perfiles principales:
-
-### 1. **IWX-JSON**  
-`Content-Type: application/vnd.iwx+json`
-
-Legible, ideal para APIs externas.
-
-### 2. **IWX-BIN**  
-`Content-Type: application/vnd.iwx+bin`
-
-Frame binario súper compacto:
-
-```text
-[MAGIC][VER][SCHEMA][COUNT][VALUES...]
+[MAGIC="IWX"][VER=0x01][SCHEMA:uint16][COUNT:uint16][LEN:uint32][JSON(_v) bytes]
 ```
 
 ---
 
-## 📐 Esquemas
-
-Definidos en:
-
-```text
-schemas/<modelo>/schema.json
+## Schema basics
+Schemas live under [`schemas/`](schemas/) and follow [`specs/SCHEMA-SPEC.md`](specs/SCHEMA-SPEC.md). Example (`schemas/sale/schema.json`):
+```json
+{
+  "schema_id": 1,
+  "fields": [
+    {"pos": 0, "frontend": "tenant", "backend": "tenant_id", "type": "string", "required": true},
+    {"pos": 1, "frontend": "sale_date", "backend": "date", "type": "date", "required": true},
+    {"pos": 2, "frontend": "amount", "backend": "total", "type": "number", "required": true}
+  ]
+}
 ```
 
-Cada campo define:
+---
 
-- `pos`
-- `frontend`
-- `backend`
-- `type`
-- `required`
+## Quick usage examples
+### JavaScript (plain → IWX JSON)
+```js
+import { iwxEncodePlain, iwxDecodeToBackend } from "./libs/js/encoder.js";
 
-Ver `specs/SCHEMA-SPEC.md` para el contrato completo.
+const sale = { tenant: "t-001", sale_date: "2025-01-01", amount: 199.9 };
+const payload = iwxEncodePlain(1, sale);
+// { _s: 1, _v: ["t-001", "2025-01-01", 199.9] }
+
+const backendObj = iwxDecodeToBackend(payload);
+// { tenant_id: "t-001", date: "2025-01-01", total: 199.9 }
+```
+
+### Python (backend object from payload)
+```python
+from libs.python.decoder import iwx_decode_to_backend
+payload = {"_s": 1, "_v": ["t-001", "2025-01-01", 199.9]}
+backend = iwx_decode_to_backend(payload)
+# {'tenant_id': 't-001', 'date': '2025-01-01', 'total': 199.9}
+```
+
+### PHP (secure encode/decode)
+```php
+use IWXSecureEncoder;
+use IWXDecoder;
+
+$key = random_bytes(32); // session key
+$payload = IWXSecureEncoder::wrapSecure(1, ['tenant' => 't-001'], $key, 'iwx-ks-123');
+$decoded = IWXSecureEncoder::unwrapSecure($payload, $key, 'backend');
+// returns backend associative array
+```
+
+### Binary transport (Python example)
+```python
+from libs.python.binary import iwx_bin_encode, iwx_bin_decode
+raw = iwx_bin_encode({"_s": 1, "_v": ["t-001", "2025-01-01", 199.9]})
+payload = iwx_bin_decode(raw)
+```
 
 ---
 
-## 💻 Implementaciones por Lenguaje
-
-Incluidas en la carpeta `libs/`:
-
-- `libs/js/`  
-- `libs/python/`  
-- `libs/php/`  
-
-Cada una incluye:
-
-- `encoder` (frontend → IWX)  
-- `decoder` (IWX → backend)  
-- `secure` (cifrado / descifrado)
+## Security considerations
+- AES-256-GCM requires 32-byte keys and 12-byte IVs; always use unique IVs per message.
+- Track `_k` (key ids) for rotation; `_a` identifies the algorithm/profile.
+- Validate schemas and required fields before encoding/after decoding.
+- Use HTTPS/TLS for transport in addition to payload encryption.
 
 ---
 
-## 🗺 Roadmap
-
-### ✔ v1.0 (incluido)
-
-- Perfil JSON  
-- Perfil Secure  
-- Perfil BIN (inicial)  
-- Esquema base  
-- Librerías iniciales  
-- Whitepaper v1.0  
-
-### 🔄 v1.1 (próximo)
-
-- IWX-BIN completo  
-- CLI `iwx-inspect`  
-- Generador automático de esquemas  
-
-### 🔮 Futuro
-
-- Soporte de algoritmos post-cuánticos  
-- Integración con WebAssembly  
-- SDK oficial multi-lenguaje  
-- Registro público de esquemas (IWX Hub)  
+## Versioning & roadmap
+- **Current draft:** v1.0 (JSON + Secure + initial BIN framing)
+- **Planned v1.1:** finalized BIN codec, `iwx-inspect` CLI, schema validator CLI, automatic schema generators.
+- **Future 2.0:** PQ-ready secure profile, WebAssembly bindings, registry-backed schema discovery, IETF-style RFC layout.
 
 ---
 
-## 🤝 Contribuir
-
-Las contribuciones son bienvenidas.  
-Puedes:
-
-- Abrir issues  
-- Proponer mejoras al protocolo  
-- Crear implementaciones en otros lenguajes  
-- Expandir el perfil seguro  
+## Repository map
+- `specs/`: protocol, secure profile, transport, and schema specifications
+- `libs/js`, `libs/python`, `libs/php`: reference libraries (plain, secure, binary)
+- `schemas/`: example schemas
+- `docs/`: documentation index and status
+- `examples/`, `papers/`: usage snippets and whitepaper draft
 
 ---
 
-## 📄 Licencia
+## Contributing
+Pull requests are welcome for protocol feedback, new language ports, security improvements, and documentation. Please align with the published specs and include tests where possible.
 
-**Apache License 2.0** (incluida en este repositorio).  
-Permite uso comercial, modificación, distribución e integración con software cerrado o abierto.
-
----
+## License
+Apache License 2.0 (see [`LICENSE`](LICENSE)).
