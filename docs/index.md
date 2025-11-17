@@ -1,7 +1,8 @@
-# IWX – Index Wire eXchange Protocol
+# IWX – Index Wire eXchange Protocol Documentation
 
-Bienvenido a la documentación de IWX.
-
-- Ver `specs/IWX-SPEC-v1.0.md` para la especificación base.
-- Ver `specs/IWX-SECURE-v1.0.md` para el perfil seguro.
-- Ver `specs/TRANSPORT-PROFILES.md` para los perfiles de transporte.
+- **Protocol specifications**: see `specs/IWX-SPEC-v1.0.md`, `specs/IWX-SECURE-v1.0.md`, `specs/TRANSPORT-PROFILES.md`, and `specs/SCHEMA-SPEC.md`.
+- **Repository status and roadmap**: `docs/STATUS.md`.
+- **Primary README (English)**: `README.md` with installation, usage, API highlights, and roadmap.
+- **Spanish README**: `README.es.md` for a localized quickstart.
+- **Schemas**: reference examples under `schemas/` (e.g., `schemas/sale/schema.json`).
+- **Libraries**: JavaScript, Python, and PHP implementations live in `libs/` with plain, secure, and binary helpers.
